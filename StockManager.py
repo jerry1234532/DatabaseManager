@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 from typing import List, Dict, Optional
+from datetime import datetime
 
 
 class StockManager:
@@ -36,11 +37,19 @@ class StockManager:
             except json.JSONDecodeError:
                 data = []
 
-        # Ensure it's a list
+        # Ensure it's a list and provide defaults for new fields
         if isinstance(data, list):
             self.items = data
         else:
             self.items = []
+
+        # Ensure backwards compatibility: provide missing fields
+        now_iso = datetime.now().isoformat()
+        for item in self.items:
+            if "type" not in item:
+                item["type"] = ""
+            if "date_added" not in item:
+                item["date_added"] = now_iso
 
     def _save(self) -> None:
         """Save current items to JSON file."""
@@ -66,13 +75,15 @@ class StockManager:
         """Return a copy of all items."""
         return list(self.items)
 
-    def add_item(self, name: str, quantity: int, unit_price: float) -> Dict:
+    def add_item(self, name: str, quantity: int, unit_price: float, item_type: str = "") -> Dict:
         """Add a new stock item and save to file."""
         new_item = {
             "id": self._next_id(),
             "name": name,
             "quantity": int(quantity),
             "unit_price": float(unit_price),
+            "type": item_type,
+            "date_added": datetime.now().isoformat(),
         }
         self.items.append(new_item)
         self._save()

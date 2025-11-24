@@ -1,8 +1,18 @@
 [
   {
     "id": 1,
-    "name": "entryTest1",
+    "name": "AMD Ryzen 7900X",
     "quantity": 1,
-    "unit_price": 1.0
+    "unit_price": 150.0,
+    "type": "CPU",
+    "date_added": "2025-11-24T22:33:00.523269"
+  },
+  {
+    "id": 2,
+    "name": "Computer",
+    "quantity": 1,
+    "unit_price": 50.0,
+    "type": "Other",
+    "date_added": "2025-11-24T22:36:40.347223"
   }
 ]

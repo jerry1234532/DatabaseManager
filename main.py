@@ -69,6 +69,8 @@ class StockApp(tk.Toplevel):
 
         # Use the shared manager passed from the main menu
         self.stock_manager = manager
+        # Predefined choices for item `type`
+        self.type_choices = ["Motherboard", "CPU", "GPU", "RAM", "PSU", "Storage", "Accessory", "Other"]
 
         self._build_ui()
         self._build_context_menu()
@@ -76,36 +78,44 @@ class StockApp(tk.Toplevel):
 
     def _build_ui(self):
         # Treeview
-        columns = ("id", "name", "quantity", "unit_price")
+        columns = ("id", "type", "name", "quantity", "unit_price", "date_added")
         self.tree = ttk.Treeview(self, columns=columns, show="headings", height=10)
         for col in columns:
-            self.tree.heading(col, text=col.capitalize())
+            self.tree.heading(col, text=col.replace("_", " ").capitalize())
             self.tree.column(col, width=120, anchor="center")
         self.tree.pack(fill="both", expand=True, padx=10, pady=10)
 
         # Right-click bindings
         self.tree.bind("<Button-3>", self._on_right_click)  # Windows/Linux
-        self.tree.bind("<Button-2>", self._on_right_click)  # macOS (often middle/right)
+        self.tree.bind("<Button-2>", self._on_right_click)  # macOS (middle/right)
 
         # Add-item form
         form = ttk.Frame(self)
         form.pack(fill="x", padx=10, pady=5)
 
-        ttk.Label(form, text="Name").grid(row=0, column=0, padx=5, pady=2, sticky="e")
-        ttk.Label(form, text="Quantity").grid(row=0, column=2, padx=5, pady=2, sticky="e")
-        ttk.Label(form, text="Unit price").grid(row=0, column=4, padx=5, pady=2, sticky="e")
+        # Layout: Type | Name | Quantity | Unit price | Add button
+        ttk.Label(form, text="Type").grid(row=0, column=0, padx=5, pady=2, sticky="e")
+        ttk.Label(form, text="Name").grid(row=0, column=2, padx=5, pady=2, sticky="e")
+        ttk.Label(form, text="Quantity").grid(row=0, column=4, padx=5, pady=2, sticky="e")
+        ttk.Label(form, text="Unit price").grid(row=0, column=6, padx=5, pady=2, sticky="e")
 
+        self.type_var = tk.StringVar()
         self.name_var = tk.StringVar()
         self.qty_var = tk.StringVar()
         self.price_var = tk.StringVar()
-
-        ttk.Entry(form, textvariable=self.name_var, width=20).grid(row=0, column=1, padx=5)
-        ttk.Entry(form, textvariable=self.qty_var, width=10).grid(row=0, column=3, padx=5)
-        ttk.Entry(form, textvariable=self.price_var, width=10).grid(row=0, column=5, padx=5)
-
-        ttk.Button(form, text="Add item", command=self.on_add_item).grid(
-            row=0, column=6, padx=10
+        self.type_combo = ttk.Combobox(
+            form,
+            textvariable=self.type_var,
+            values=self.type_choices,
+            width=12,
+            state="readonly",
         )
+        self.type_combo.grid(row=0, column=1, padx=5)
+        ttk.Entry(form, textvariable=self.name_var, width=25).grid(row=0, column=3, padx=5)
+        ttk.Entry(form, textvariable=self.qty_var, width=8).grid(row=0, column=5, padx=5)
+        ttk.Entry(form, textvariable=self.price_var, width=10).grid(row=0, column=7, padx=5)
+
+        ttk.Button(form, text="Add item", command=self.on_add_item).grid(row=0, column=8, padx=10)
 
     def _build_context_menu(self):
         self.context_menu = tk.Menu(self, tearoff=0)
@@ -133,10 +143,18 @@ class StockApp(tk.Toplevel):
             self.tree.insert(
                 "",
                 "end",
-                values=(item["id"], item["name"], item["quantity"], item["unit_price"]),
+                values=(
+                    item.get("id"),
+                    item.get("type", ""),
+                    item.get("name", ""),
+                    item.get("quantity", ""),
+                    item.get("unit_price", ""),
+                    item.get("date_added", ""),
+                ),
             )
 
     def on_add_item(self):
+        item_type = self.type_var.get().strip()
         name = self.name_var.get().strip()
         qty_text = self.qty_var.get().strip()
         price_text = self.price_var.get().strip()
@@ -152,8 +170,9 @@ class StockApp(tk.Toplevel):
             messagebox.showerror("Error", "Quantity must be an integer and price a number.")
             return
 
-        self.stock_manager.add_item(name, qty, price)
+        self.stock_manager.add_item(name, qty, price, item_type=item_type)
 
+        self.type_var.set("")
         self.name_var.set("")
         self.qty_var.set("")
         self.price_var.set("")
@@ -210,21 +229,31 @@ class EditItemDialog(tk.Toplevel):
         self.transient(parent)  # stay on top of parent
         self.grab_set()         # modal
 
-        self.name_var = tk.StringVar(value=item["name"])
-        self.qty_var = tk.StringVar(value=str(item["quantity"]))
-        self.price_var = tk.StringVar(value=str(item["unit_price"]))
+        self.type_var = tk.StringVar(value=item.get("type", ""))
+        self.name_var = tk.StringVar(value=item.get("name", ""))
+        self.qty_var = tk.StringVar(value=str(item.get("quantity", "")))
+        self.price_var = tk.StringVar(value=str(item.get("unit_price", "")))
+        self.date_var = tk.StringVar(value=item.get("date_added", ""))
 
         frame = ttk.Frame(self, padding=10)
         frame.pack(fill="both", expand=True)
 
-        ttk.Label(frame, text="Name:").grid(row=0, column=0, sticky="e", pady=5)
-        ttk.Entry(frame, textvariable=self.name_var, width=25).grid(row=0, column=1, pady=5)
+        ttk.Label(frame, text="Type:").grid(row=0, column=0, sticky="e", pady=5)
+        # Use parent's predefined choices for type (parent is StockApp)
+        self.type_combo = ttk.Combobox(frame, textvariable=self.type_var, width=25, values=parent.type_choices, state="readonly")
+        self.type_combo.grid(row=0, column=1, pady=5)
 
-        ttk.Label(frame, text="Quantity:").grid(row=1, column=0, sticky="e", pady=5)
-        ttk.Entry(frame, textvariable=self.qty_var, width=10).grid(row=1, column=1, pady=5, sticky="w")
+        ttk.Label(frame, text="Name:").grid(row=1, column=0, sticky="e", pady=5)
+        ttk.Entry(frame, textvariable=self.name_var, width=25).grid(row=1, column=1, pady=5)
 
-        ttk.Label(frame, text="Unit price:").grid(row=2, column=0, sticky="e", pady=5)
-        ttk.Entry(frame, textvariable=self.price_var, width=10).grid(row=2, column=1, pady=5, sticky="w")
+        ttk.Label(frame, text="Quantity:").grid(row=2, column=0, sticky="e", pady=5)
+        ttk.Entry(frame, textvariable=self.qty_var, width=10).grid(row=2, column=1, pady=5, sticky="w")
+
+        ttk.Label(frame, text="Unit price:").grid(row=3, column=0, sticky="e", pady=5)
+        ttk.Entry(frame, textvariable=self.price_var, width=10).grid(row=3, column=1, pady=5, sticky="w")
+
+        ttk.Label(frame, text="Date added:").grid(row=4, column=0, sticky="e", pady=5)
+        ttk.Entry(frame, textvariable=self.date_var, width=25, state="readonly").grid(row=4, column=1, pady=5, sticky="w")
 
         btn_frame = ttk.Frame(frame)
         btn_frame.grid(row=3, column=0, columnspan=2, pady=10)
@@ -240,6 +269,7 @@ class EditItemDialog(tk.Toplevel):
 
     def _save(self):
         name = self.name_var.get().strip()
+        item_type = self.type_var.get().strip()
         qty_text = self.qty_var.get().strip()
         price_text = self.price_var.get().strip()
 
@@ -260,6 +290,7 @@ class EditItemDialog(tk.Toplevel):
                 name=name,
                 quantity=qty,
                 unit_price=price,
+                type=item_type,
             )
         except KeyError:
             messagebox.showerror("Error", "Item no longer exists.", parent=self)
