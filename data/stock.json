@@ -1,1 +1,8 @@
-[]
+[
+  {
+    "id": 1,
+    "name": "entryTest1",
+    "quantity": 1,
+    "unit_price": 1.0
+  }
+]

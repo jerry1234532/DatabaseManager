@@ -4,13 +4,71 @@ from tkinter import ttk, messagebox
 from StockManager import StockManager   # your previous class
 
 
-class StockApp(tk.Tk):
+class MainMenu(tk.Tk):
     def __init__(self):
         super().__init__()
+        self.title("Business System - Main Menu")
+        self.geometry("400x250")
+
+        # You can share managers across windows if you like
+        self.stock_manager = StockManager("data/stock.json")
+
+        self._build_ui()
+
+    def _build_ui(self):
+        frame = ttk.Frame(self, padding=20)
+        frame.pack(fill="both", expand=True)
+
+        ttk.Label(frame, text="Main Menu", font=("Arial", 16)).pack(pady=10)
+
+        ttk.Button(
+            frame,
+            text="Stock Manager",
+            command=self.open_stock_window
+        ).pack(fill="x", pady=5)
+
+        ttk.Button(
+            frame,
+            text="Orders (todo)",
+            command=self.open_orders_window
+        ).pack(fill="x", pady=5)
+
+        ttk.Button(
+            frame,
+            text="Payments (todo)",
+            command=self.open_payments_window
+        ).pack(fill="x", pady=5)
+
+        ttk.Separator(frame).pack(fill="x", pady=10)
+
+        ttk.Button(frame, text="Quit", command=self.destroy).pack(pady=5)
+
+    # --------- button callbacks ----------
+
+    def open_stock_window(self):
+        StockApp(self, self.stock_manager)
+
+    def open_orders_window(self):
+        messagebox.showinfo("Orders", "Orders window not implemented yet.", parent=self)
+
+    def open_payments_window(self):
+        messagebox.showinfo("Payments", "Payments window not implemented yet.", parent=self)
+    
+
+
+
+
+
+
+class StockApp(tk.Toplevel):
+    def __init__(self, parent, manager: StockManager):
+        super().__init__(parent)
+        self.transient(parent)
         self.title("RIG PC Stock Manager V0.1")
         self.geometry("700x400")
 
-        self.stock_manager = StockManager("data/stock.json")
+        # Use the shared manager passed from the main menu
+        self.stock_manager = manager
 
         self._build_ui()
         self._build_context_menu()
@@ -214,5 +272,5 @@ class EditItemDialog(tk.Toplevel):
 
 
 if __name__ == "__main__":
-    app = StockApp()
+    app = MainMenu()
     app.mainloop()

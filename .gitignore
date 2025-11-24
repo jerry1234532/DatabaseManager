@@ -1,0 +1,10 @@
+# PyInstaller build folders
+dist/
+build/
+
+# PyInstaller spec file
+*.spec
+
+# Virtual environment (optional)
+venv/
+env/
