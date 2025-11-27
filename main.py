@@ -1,7 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-from StockManager import StockManager   # your previous class
+from OrderManager import OrderManager      # DATA manager (JSON etc.)
+from StockManager import StockManager      # DATA manager for stock
 
 
 class MainMenu(tk.Tk):
@@ -10,8 +11,9 @@ class MainMenu(tk.Tk):
         self.title("Business System - Main Menu")
         self.geometry("400x250")
 
-        # You can share managers across windows if you like
+        # shared managers
         self.stock_manager = StockManager("data/stock.json")
+        self.order_manager = OrderManager()   # <--- create this!
 
         self._build_ui()
 
@@ -29,7 +31,7 @@ class MainMenu(tk.Tk):
 
         ttk.Button(
             frame,
-            text="Orders (todo)",
+            text="Orders / Sales Manager",
             command=self.open_orders_window
         ).pack(fill="x", pady=5)
 
@@ -49,16 +51,14 @@ class MainMenu(tk.Tk):
         StockApp(self, self.stock_manager)
 
     def open_orders_window(self):
-        messagebox.showinfo("Orders", "Orders window not implemented yet.", parent=self)
+        # open orders window (GUI), pass in the shared OrderManager
+        OrdersWindow(self, self.order_manager)
 
     def open_payments_window(self):
         messagebox.showinfo("Payments", "Payments window not implemented yet.", parent=self)
-    
 
 
-
-
-
+# ================== STOCK WINDOW ==================
 
 class StockApp(tk.Toplevel):
     def __init__(self, parent, manager: StockManager):
@@ -240,7 +240,13 @@ class EditItemDialog(tk.Toplevel):
 
         ttk.Label(frame, text="Type:").grid(row=0, column=0, sticky="e", pady=5)
         # Use parent's predefined choices for type (parent is StockApp)
-        self.type_combo = ttk.Combobox(frame, textvariable=self.type_var, width=25, values=parent.type_choices, state="readonly")
+        self.type_combo = ttk.Combobox(
+            frame,
+            textvariable=self.type_var,
+            width=25,
+            values=parent.type_choices,
+            state="readonly"
+        )
         self.type_combo.grid(row=0, column=1, pady=5)
 
         ttk.Label(frame, text="Name:").grid(row=1, column=0, sticky="e", pady=5)
@@ -256,7 +262,7 @@ class EditItemDialog(tk.Toplevel):
         ttk.Entry(frame, textvariable=self.date_var, width=25, state="readonly").grid(row=4, column=1, pady=5, sticky="w")
 
         btn_frame = ttk.Frame(frame)
-        btn_frame.grid(row=3, column=0, columnspan=2, pady=10)
+        btn_frame.grid(row=5, column=0, columnspan=2, pady=10)
 
         ttk.Button(btn_frame, text="Save", command=self._save).pack(side="left", padx=5)
         ttk.Button(btn_frame, text="Cancel", command=self.destroy).pack(side="left", padx=5)
@@ -300,8 +306,200 @@ class EditItemDialog(tk.Toplevel):
         if self.on_saved:
             self.on_saved()
         self.destroy()
-# --------- main entry point ---------
+
+
+# ================== ORDERS WINDOW ==================
+
+class OrdersWindow(tk.Toplevel):
+    def __init__(self, parent, order_manager: OrderManager):
+        super().__init__(parent)
+        self.title("Order / Sales Manager")
+        self.geometry("900x400")
+
+        self.order_manager = order_manager
+
+        self._build_ui()
+        self._load_orders()
+
+        self.transient(parent)
+        self.grab_set()
+
+    def _build_ui(self):
+        top = ttk.Frame(self)
+        top.pack(fill="x", padx=10, pady=5)
+
+        ttk.Label(top, text="View:").pack(side="left")
+        self.filter_var = tk.StringVar(value="all")
+        filter_box = ttk.Combobox(
+            top,
+            textvariable=self.filter_var,
+            values=["all", "sale", "parts"],
+            width=10,
+            state="readonly",
+        )
+        filter_box.pack(side="left", padx=5)
+        filter_box.bind("<<ComboboxSelected>>", lambda e: self._load_orders())
+
+        # Treeview
+        columns = (
+            "id",
+            "kind",
+            "title",
+            "contact",
+            "from_where",
+            "by_who",
+            "date",
+            "status",
+        )
+        self.tree = ttk.Treeview(self, columns=columns, show="headings", height=12)
+        for col in columns:
+            self.tree.heading(col, text=col.capitalize())
+            self.tree.column(col, width=110, anchor="center")
+        self.tree.pack(fill="both", expand=True, padx=10, pady=5)
+
+        # Simple form to add new order
+        form = ttk.LabelFrame(self, text="Add new order")
+        form.pack(fill="x", padx=10, pady=5)
+
+        # row 0
+        ttk.Label(form, text="Type").grid(row=0, column=0, padx=5, pady=2, sticky="e")
+        ttk.Label(form, text="Title").grid(row=0, column=2, padx=5, pady=2, sticky="e")
+        ttk.Label(form, text="Contact").grid(row=0, column=4, padx=5, pady=2, sticky="e")
+
+        self.kind_var = tk.StringVar(value="sale")
+        self.title_var = tk.StringVar()
+        self.contact_var = tk.StringVar()
+
+        ttk.Combobox(
+            form,
+            textvariable=self.kind_var,
+            values=["sale", "parts"],
+            width=8,
+            state="readonly",
+        ).grid(row=0, column=1, padx=5, pady=2)
+
+        ttk.Entry(form, textvariable=self.title_var, width=25).grid(
+            row=0, column=3, padx=5, pady=2
+        )
+        ttk.Entry(form, textvariable=self.contact_var, width=20).grid(
+            row=0, column=5, padx=5, pady=2
+        )
+
+        # row 1
+        ttk.Label(form, text="From where").grid(
+            row=1, column=0, padx=5, pady=2, sticky="e"
+        )
+        ttk.Label(form, text="By who").grid(row=1, column=2, padx=5, pady=2, sticky="e")
+        ttk.Label(form, text="Date (YYYY-MM-DD)").grid(
+            row=1, column=4, padx=5, pady=2, sticky="e"
+        )
+
+        self.from_where_var = tk.StringVar()
+        self.by_who_var = tk.StringVar()
+        self.date_var = tk.StringVar()
+        self.status_var = tk.StringVar(value="open")
+
+        ttk.Entry(form, textvariable=self.from_where_var, width=20).grid(
+            row=1, column=1, padx=5, pady=2
+        )
+        ttk.Entry(form, textvariable=self.by_who_var, width=20).grid(
+            row=1, column=3, padx=5, pady=2
+        )
+        ttk.Entry(form, textvariable=self.date_var, width=12).grid(
+            row=1, column=5, padx=5, pady=2
+        )
+
+        # row 2
+        ttk.Label(form, text="Status").grid(
+            row=2, column=0, padx=5, pady=2, sticky="e"
+        )
+        ttk.Label(form, text="Notes").grid(
+            row=2, column=2, padx=5, pady=2, sticky="e"
+        )
+
+        self.notes_var = tk.StringVar()
+
+        ttk.Combobox(
+            form,
+            textvariable=self.status_var,
+            values=["open", "in_talks", "ordered", "received", "won", "lost", "closed"],
+            width=12,
+            state="readonly",
+        ).grid(row=2, column=1, padx=5, pady=2)
+
+        ttk.Entry(form, textvariable=self.notes_var, width=40).grid(
+            row=2, column=3, columnspan=3, padx=5, pady=2, sticky="w"
+        )
+
+        ttk.Button(form, text="Add", command=self.on_add).grid(
+            row=0, column=6, rowspan=3, padx=10
+        )
+
+    def _load_orders(self):
+        # Clear
+        for row in self.tree.get_children():
+            self.tree.delete(row)
+
+        filt = self.filter_var.get()
+        if filt == "sale":
+            orders = self.order_manager.get_by_kind("sale")
+        elif filt == "parts":
+            orders = self.order_manager.get_by_kind("parts")
+        else:
+            orders = self.order_manager.get_all()
+
+        for o in orders:
+            self.tree.insert(
+                "",
+                "end",
+                values=(
+                    o["id"],
+                    o["kind"],
+                    o["title"],
+                    o["contact"],
+                    o["from_where"],
+                    o["by_who"],
+                    o["date"],
+                    o["status"],
+                ),
+            )
+
+    def on_add(self):
+        title = self.title_var.get().strip()
+        kind = self.kind_var.get().strip()
+        contact = self.contact_var.get().strip()
+        from_where = self.from_where_var.get().strip()
+        by_who = self.by_who_var.get().strip()
+        date = self.date_var.get().strip()
+        status = self.status_var.get().strip()
+        notes = self.notes_var.get().strip()
+
+        if not title:
+            messagebox.showerror("Error", "Title is required.", parent=self)
+            return
+
+        self.order_manager.add_order(
+            kind=kind,
+            title=title,
+            contact=contact,
+            from_where=from_where,
+            by_who=by_who,
+            date=date,
+            status=status,
+            notes=notes,
+        )
+
+        # clear fields & reload list
+        self.title_var.set("")
+        self.contact_var.set("")
+        self.from_where_var.set("")
+        self.by_who_var.set("")
+        self.date_var.set("")
+        self.notes_var.set("")
+        self._load_orders()
+
 
 if __name__ == "__main__":
     app = MainMenu()
     app.mainloop()
+
