@@ -300,7 +300,7 @@ class EditItemDialog(tk.Toplevel):
         if self.on_saved:
             self.on_saved()
         self.destroy()
-
+# --------- main entry point ---------
 
 if __name__ == "__main__":
     app = MainMenu()
